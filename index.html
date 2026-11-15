@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Fuel Log">
+<title>Fuel Log</title>
+<style>
+:root { --bg: #ffffff; --ink: #222222; --mute: #8c8c8c; --line: #e5e5e5; --green: #2db84d; --red: #c0392b }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0e0e0e; --ink: #e4e4e4; --mute: #858585; --line: #2b2b2b; --green: #45d667; --red: #ff8272; color-scheme: dark }
+}
+* { box-sizing: border-box }
+html { -webkit-text-size-adjust: 100% }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 Georgia, "Times New Roman", Times, serif; text-align: center }
+main { max-width: 400px; margin: 0 auto;
+  padding: calc(44px + env(safe-area-inset-top, 0px)) max(22px, env(safe-area-inset-right, 0px)) calc(56px + env(safe-area-inset-bottom, 0px)) max(22px, env(safe-area-inset-left, 0px)) }
+[hidden] { display: none !important }
+h1 { font-size: 17px; font-weight: normal; margin: 0 }
+hr { border: 0; border-top: 1px solid var(--line); margin: 26px 0 }
+i, em, .it { font-style: italic }
+.mute { color: var(--mute) }
+.sm { font-size: 13px }
+.num { font-variant-numeric: tabular-nums }
+button { background: none; border: 0; font: inherit; color: inherit; padding: 6px 4px; margin: 0; cursor: pointer; border-radius: 0 }
+.link { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--mute) }
+button:disabled { color: var(--line); cursor: default }
+input, select { font: 16px Georgia, "Times New Roman", serif; color: inherit; background: transparent; border: 0; border-bottom: 1px solid var(--line);
+  border-radius: 0; padding: 6px 2px; text-align: center; width: 100%; min-width: 0; -webkit-appearance: none; appearance: none }
+input:focus, select:focus { outline: none; border-bottom-color: var(--ink) }
+button:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px }
+input::placeholder { color: var(--mute); font-style: italic }
+
+.date { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 2px }
+.date button { padding: 6px 12px }
+#dateLabel { font-style: italic; font-size: 13px; min-width: 150px }
+
+.row { display: flex; justify-content: center; align-items: baseline; gap: 10px }
+#weight { width: 96px; font-size: 22px }
+#cre { display: inline-flex; align-items: center; gap: 9px; padding: 10px 8px; margin-top: 6px }
+#cre .dot { width: 11px; height: 11px; border-radius: 50%; border: 1px solid var(--mute); display: inline-block }
+#cre[aria-checked="true"] .dot { background: var(--green); border-color: var(--green) }
+
+#kcal { font-size: 46px; line-height: 1.1; letter-spacing: -0.01em }
+.bar { height: 2px; background: var(--line); margin: 14px 0 0 }
+.bar b { display: block; height: 100%; width: 0; background: var(--ink); transition: width .25s }
+#kbar b { background: var(--green) }
+#left.over { color: var(--red) }
+.macros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 20px }
+.macros div { min-width: 0 }
+.macros .v { font-size: 19px }
+
+ol { list-style: none; margin: 0; padding: 0; text-align: left }
+ol li { display: grid; grid-template-columns: 1fr auto auto; column-gap: 12px; align-items: baseline; padding: 7px 0 }
+ol .n { min-width: 0; overflow-wrap: anywhere }
+ol .s { grid-column: 1; font-size: 12px; color: var(--mute) }
+ol .k { grid-row: 1; grid-column: 2 }
+ol .x { grid-row: 1; grid-column: 3; color: var(--mute); padding: 2px 6px }
+form { margin: 0 }
+.four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 8px }
+.five { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 8px }
+#again { margin-top: 10px; line-height: 2 }
+#again button { padding: 2px 4px }
+
+#chart { width: 100%; height: auto; display: block; margin-top: 10px }
+#chart text { font: italic 10px Georgia, serif; fill: var(--mute) }
+#dots { letter-spacing: 0.32em; font-size: 14px; margin-top: 4px; padding-left: 0.32em }
+#dots .on { color: var(--green) }
+#dots .off { color: var(--line) }
+footer { font-size: 13px; color: var(--mute) }
+footer .sep { margin: 0 2px }
+#sync.bad { color: var(--red) }
+#setup p { margin: 0 0 14px }
+#setup input { margin-bottom: 14px }
+@media (prefers-reduced-motion: reduce) { .bar b { transition: none } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Fuel Log</h1>
+
+  <section id="setup" hidden>
+    <p class="it sm mute">private</p>
+    <hr>
+    <p>This log is kept in a private GitHub repository. Paste your access key once to open it on this device.</p>
+    <form id="setupForm">
+      <input id="sOwner" aria-label="GitHub username" placeholder="GitHub username" autocapitalize="off" autocomplete="off" spellcheck="false" required>
+      <input id="sRepo" aria-label="Data repository" placeholder="data repository" autocapitalize="off" autocomplete="off" spellcheck="false" required>
+      <input id="sToken" aria-label="Access key" type="password" placeholder="access key" autocomplete="off" required>
+      <button class="link" type="submit">Connect</button>
+    </form>
+    <p id="setupMsg" class="sm mute" style="margin-top:14px">The key stays on this device and is sent only to GitHub.</p>
+  </section>
+
+  <section id="app" hidden>
+    <div class="date">
+      <button id="prev" aria-label="Previous day">‹</button>
+      <button id="dateLabel" title="Back to today"></button>
+      <button id="next" aria-label="Next day">›</button>
+    </div>
+    <hr>
+
+    <div class="row">
+      <label for="weight" class="it mute">weight</label>
+      <input id="weight" class="num" type="number" inputmode="decimal" step="0.1" min="0" placeholder="—">
+      <span class="it mute unit">lb</span>
+    </div>
+    <div>
+      <button id="cre" role="switch" aria-checked="false"><span class="dot"></span><span>Creatine</span><span id="creState" class="it mute">not taken</span></button>
+    </div>
+    <div id="streak" class="sm it mute"></div>
+    <hr>
+
+    <div id="kcal" class="num">0</div>
+    <div class="sm"><span class="it mute">of <span id="goal" class="num">2,200</span> kcal ·</span> <span id="left" class="num">2,200 left</span></div>
+    <div class="bar" id="kbar"><b></b></div>
+    <div class="macros">
+      <div><div class="v num" id="pv">0</div><div class="sm it mute">protein · <span id="pg">150</span></div><div class="bar" id="pbar"><b></b></div></div>
+      <div><div class="v num" id="cv">0</div><div class="sm it mute">carbs · <span id="cg">240</span></div><div class="bar" id="cbar"><b></b></div></div>
+      <div><div class="v num" id="fv">0</div><div class="sm it mute">fat · <span id="fg">70</span></div><div class="bar" id="fbar"><b></b></div></div>
+    </div>
+    <hr>
+
+    <ol id="meals"></ol>
+    <p id="none" class="sm it mute" style="margin:0 0 14px">Nothing logged yet.</p>
+    <form id="add">
+      <input id="aName" aria-label="Food" placeholder="food" maxlength="120" required>
+      <div class="four">
+        <input id="aK" aria-label="Calories" type="number" inputmode="numeric" min="0" placeholder="kcal" required>
+        <input id="aP" aria-label="Protein grams" type="number" inputmode="decimal" min="0" placeholder="P">
+        <input id="aC" aria-label="Carb grams" type="number" inputmode="decimal" min="0" placeholder="C">
+        <input id="aF" aria-label="Fat grams" type="number" inputmode="decimal" min="0" placeholder="F">
+      </div>
+      <button class="link" type="submit" style="margin-top:10px">Add</button>
+    </form>
+    <div id="again" class="sm" hidden></div>
+    <hr>
+
+    <div id="trend" class="sm it mute"></div>
+    <svg id="chart" viewBox="0 0 320 110" role="img" aria-label="Weight over time" hidden></svg>
+    <div id="dots" aria-hidden="true"></div>
+    <div class="sm it mute">creatine, last 14 days</div>
+    <hr>
+
+    <form id="targets" hidden>
+      <div class="five">
+        <input id="gK" aria-label="Calorie target" type="number" inputmode="numeric" min="0" required>
+        <input id="gP" aria-label="Protein target" type="number" inputmode="numeric" min="0" required>
+        <input id="gC" aria-label="Carb target" type="number" inputmode="numeric" min="0" required>
+        <input id="gF" aria-label="Fat target" type="number" inputmode="numeric" min="0" required>
+        <select id="gU" aria-label="Weight unit"><option>lb</option><option>kg</option></select>
+      </div>
+      <div class="sm it mute" style="margin-top:6px">kcal · protein · carbs · fat · unit</div>
+      <button class="link" type="submit" style="margin:8px 0 14px">Save targets</button>
+    </form>
+    <footer>
+      <button id="sync">—</button><span class="sep">·</span><button id="tBtn" class="link">Targets</button><span class="sep">·</span><button id="refresh" class="link">Refresh</button><span class="sep">·</span><button id="out" class="link">Disconnect</button>
+    </footer>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var CFG_KEY = "fuellog.cfg", CACHE_KEY = "fuellog.cache";
+  var DEFAULTS = { kcal: 2200, protein: 150, carbs: 240, fat: 70, unit: "lb" };
+  var store = {
+    get: function (k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+    del: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
+  };
+
+  /* ---- dates ---- */
+  var pad = function (n) { return String(n).padStart(2, "0"); };
+  var key = function (d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+  var parse = function (k) { var p = k.split("-").map(Number); return new Date(p[0], p[1] - 1, p[2]); };
+  var shift = function (k, n) { var d = parse(k); d.setDate(d.getDate() + n); return key(d); };
+  var today = function () { return key(new Date()); };
+  var monthPath = function (k) { return "data/" + k.slice(0, 7) + ".json"; };
+  var fmt = function (n) { return Math.round(n || 0).toLocaleString("en-US"); };
+  var g1 = function (v) { return Math.max(0, Math.round((Number(v) || 0) * 10) / 10); };
+
+  /* ---- GitHub contents API ---- */
+  var cfg = store.get(CFG_KEY) || { owner: "M00240", repo: "fuel-log-data", token: "" };
+  var base = function () { return "https://api.github.com/repos/" + encodeURIComponent(cfg.owner) + "/" + encodeURIComponent(cfg.repo); };
+  var headers = function () { return { "Accept": "application/vnd.github+json", "Authorization": "Bearer " + cfg.token, "X-GitHub-Api-Version": "2022-11-28" }; };
+  var enc = function (s) { var b = new TextEncoder().encode(s), o = ""; for (var i = 0; i < b.length; i += 0x8000) o += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(o); };
+  var dec = function (s) { return new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g, "")), function (c) { return c.charCodeAt(0); })); };
+  async function ghGet(path) {
+    var r = await fetch(base() + "/contents/" + path, { headers: headers(), cache: "no-store" });
+    if (r.status === 404) return { sha: null, data: null };
+    if (!r.ok) throw { status: r.status };
+    var j = await r.json();
+    return { sha: j.sha, data: JSON.parse(dec(j.content)) };
+  }
+  async function ghPut(path, data, sha, msg) {
+    var body = { message: msg, content: enc(JSON.stringify(data, null, 1) + "\n") };
+    if (sha) body.sha = sha;
+    var r = await fetch(base() + "/contents/" + path, { method: "PUT", headers: headers(), body: JSON.stringify(body) });
+    if (r.status === 409 || r.status === 422) throw { conflict: true };
+    if (!r.ok) throw { status: r.status };
+    return (await r.json()).content.sha;
+  }
+
+  /* ---- state ---- */
+  var S = { date: today(), files: {}, pending: [], busy: false, lastRefresh: 0 };
+  var blank = function (path) { return path === "goals.json" ? Object.assign({}, DEFAULTS) : { days: {} }; };
+  var shape = function (path, data) {
+    if (!data || typeof data !== "object") return blank(path);
+    if (path === "goals.json") return Object.assign({}, DEFAULTS, data);
+    if (!data.days || typeof data.days !== "object") data.days = {};
+    return data;
+  };
+  function saveCache() {
+    var out = {};
+    Object.keys(S.files).forEach(function (p) { out[p] = { sha: S.files[p].sha, data: S.files[p].data }; });
+    store.set(CACHE_KEY, out);
+  }
+  function hasPending(path) { return S.pending.some(function (p) { return p.path === path; }); }
+  function file(path) {
+    if (!S.files[path]) {
+      var c = (store.get(CACHE_KEY) || {})[path];
+      S.files[path] = { sha: c ? c.sha : null, data: shape(path, c ? c.data : null), fetched: false };
+      load(path);
+    }
+    return S.files[path];
+  }
+  async function load(path) {
+    try {
+      var fresh = await ghGet(path);
+      if (hasPending(path)) return;
+      var f = S.files[path];
+      f.sha = fresh.sha; f.data = shape(path, fresh.data); f.fetched = true;
+      saveCache(); render();
+      if (!S.pending.length && !S.busy) setSync("Saved");
+    } catch (e) { fail(e, "Couldn't load"); }
+  }
+  var goals = function () { return file("goals.json").data; };
+  var dayOf = function (k) { return file(monthPath(k)).data.days[k] || {}; };
+  function allDays() {
+    var out = {};
+    Object.keys(S.files).forEach(function (p) { if (p.indexOf("data/") === 0) Object.assign(out, S.files[p].data.days); });
+    return out;
+  }
+
+  /* ---- saving: apply locally, then write the file; on a version clash refetch and reapply ---- */
+  function mutate(path, fn, msg) {
+    fn(file(path).data);
+    S.pending.push({ path: path, fn: fn, msg: msg });
+    saveCache(); render(); pump();
+  }
+  function mutateDay(k, fn, msg) {
+    mutate(monthPath(k), function (data) {
+      var d = data.days[k] || (data.days[k] = {});
+      fn(d);
+      if (d.meals && !d.meals.length) delete d.meals;
+      if (!Object.keys(d).length) delete data.days[k];
+    }, msg);
+  }
+  async function pump() {
+    if (S.busy) return;
+    S.busy = true; setSync("Saving…");
+    try {
+      while (S.pending.length) {
+        var op = S.pending[0], f = S.files[op.path];
+        var batch = S.pending.filter(function (p) { return p.path === op.path; });
+        try {
+          f.sha = await ghPut(op.path, f.data, f.sha, op.msg);
+        } catch (e) {
+          if (!e.conflict) throw e;
+          var fresh = await ghGet(op.path);
+          var data = shape(op.path, fresh.data);
+          batch = S.pending.filter(function (p) { return p.path === op.path; });
+          batch.forEach(function (p) { p.fn(data); });
+          f.data = data; f.sha = fresh.sha; render();
+          f.sha = await ghPut(op.path, f.data, f.sha, op.msg);
+        }
+        f.fetched = true;
+        S.pending = S.pending.filter(function (p) { return batch.indexOf(p) < 0; });
+        saveCache();
+      }
+      setSync("Saved");
+    } catch (e) { fail(e, "Not saved"); }
+    S.busy = false;
+  }
+  function setSync(text, bad) { var el = $("sync"); el.textContent = text; el.className = bad ? "bad link" : ""; }
+  function fail(e, what) {
+    var s = e && e.status;
+    setSync(s === 401 ? "Access key rejected. Disconnect and paste a new one."
+      : s === 404 ? "Data repository not found. Check the key covers it."
+      : s === 403 ? what + ". The key needs Contents: read and write."
+      : what + ". Tap to retry.", true);
+  }
+  function refresh() {
+    S.lastRefresh = Date.now();
+    Object.keys(S.files).forEach(function (p) { if (!hasPending(p)) load(p); });
+  }
+
+  /* ---- render ---- */
+  function bar(id, v, g) { $(id).firstElementChild.style.width = (g > 0 ? Math.min(100, v / g * 100) : 0) + "%"; }
+  function render() {
+    if ($("app").hidden) return;
+    var t = today(), g = goals(), day = dayOf(S.date), isToday = S.date === t;
+    file(monthPath(shift(S.date.slice(0, 8) + "01", -1)));
+    $("dateLabel").textContent = parse(S.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+    $("next").disabled = isToday;
+    document.querySelectorAll(".unit").forEach(function (el) { el.textContent = g.unit; });
+
+    var w = $("weight");
+    if (document.activeElement !== w) w.value = day.weight != null ? day.weight : "";
+    var on = !!day.creatine;
+    $("cre").setAttribute("aria-checked", String(on));
+    $("creState").textContent = on ? "taken" : "not taken";
+    var days = allDays(), n = 0, d = t;
+    if (!(days[d] && days[d].creatine)) d = shift(d, -1);
+    while (days[d] && days[d].creatine) { n++; d = shift(d, -1); }
+    $("streak").textContent = n > 1 ? n + " days in a row" : "";
+
+    var meals = (day.meals || []).slice().sort(function (a, b) { return String(a.at).localeCompare(String(b.at)); });
+    var sum = { k: 0, p: 0, c: 0, f: 0 };
+    meals.forEach(function (m) { sum.k += m.kcal || 0; sum.p += m.protein || 0; sum.c += m.carbs || 0; sum.f += m.fat || 0; });
+    $("kcal").textContent = fmt(sum.k);
+    $("goal").textContent = fmt(g.kcal);
+    var left = g.kcal - sum.k;
+    $("left").textContent = left >= 0 ? fmt(left) + " left" : fmt(-left) + " over";
+    $("left").className = "num" + (left < 0 ? " over" : "");
+    bar("kbar", sum.k, g.kcal);
+    $("pv").textContent = fmt(sum.p); $("cv").textContent = fmt(sum.c); $("fv").textContent = fmt(sum.f);
+    $("pg").textContent = fmt(g.protein); $("cg").textContent = fmt(g.carbs); $("fg").textContent = fmt(g.fat);
+    bar("pbar", sum.p, g.protein); bar("cbar", sum.c, g.carbs); bar("fbar", sum.f, g.fat);
+
+    var ol = $("meals"); ol.textContent = "";
+    meals.forEach(function (m, i) {
+      var li = document.createElement("li");
+      var nm = document.createElement("span"); nm.className = "n"; nm.textContent = (i + 1) + ". " + (m.name || "Meal");
+      var k = document.createElement("span"); k.className = "k num"; k.textContent = fmt(m.kcal);
+      var x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.setAttribute("aria-label", "Delete " + (m.name || "meal"));
+      x.onclick = function () { removeMeal(m); };
+      var s = document.createElement("span"); s.className = "s num it"; s.textContent = "P " + fmt(m.protein) + "  C " + fmt(m.carbs) + "  F " + fmt(m.fat);
+      li.append(nm, k, x, s); ol.append(li);
+    });
+    $("none").hidden = meals.length > 0;
+    $("none").textContent = isToday ? "Nothing logged yet today." : "Nothing logged this day.";
+
+    renderAgain(days);
+    renderTrend(days, g.unit);
+  }
+  function renderAgain(days) {
+    var seen = {}, list = [];
+    Object.keys(days).sort().reverse().forEach(function (k) {
+      (days[k].meals || []).forEach(function (m) {
+        var id = String(m.name || "").trim().toLowerCase();
+        if (!id) return;
+        if (!seen[id]) { seen[id] = { m: m, n: 0 }; list.push(seen[id]); }
+        seen[id].n++;
+      });
+    });
+    list.sort(function (a, b) { return b.n - a.n; });
+    var box = $("again"); box.textContent = "";
+    list.slice(0, 6).forEach(function (e, i) {
+      if (i) box.append(document.createTextNode(" · "));
+      var b = document.createElement("button"); b.className = "link"; b.textContent = e.m.name;
+      b.title = "Log again: " + fmt(e.m.kcal) + " kcal";
+      b.onclick = function () { addMeal(e.m); };
+      box.append(b);
+    });
+    box.hidden = !list.length;
+    if (list.length) box.prepend(Object.assign(document.createElement("span"), { className: "it mute", textContent: "again: " }));
+  }
+  function renderTrend(days, unit) {
+    var t = today(), dots = $("dots"); dots.textContent = "";
+    for (var i = 13; i >= 0; i--) {
+      var k = shift(t, -i), s = document.createElement("span"), on = days[k] && days[k].creatine;
+      s.className = on ? "on" : "off"; s.textContent = on ? "●" : "○";
+      dots.append(s);
+    }
+    var pts = Object.keys(days).filter(function (k) { return typeof days[k].weight === "number"; }).sort().slice(-30)
+      .map(function (k) { return { date: k, w: days[k].weight }; });
+    var svg = $("chart"), txt = $("trend");
+    if (pts.length < 2) {
+      svg.setAttribute("hidden", "");
+      txt.textContent = pts.length ? "one weigh-in so far · " + pts[0].w + " " + unit : "weigh in on two mornings to see the trend";
+      return;
+    }
+    var avg = function (from, to) {
+      var xs = pts.filter(function (p) { return p.date > from && p.date <= to; }).map(function (p) { return p.w; });
+      return xs.length ? xs.reduce(function (a, b) { return a + b; }, 0) / xs.length : null;
+    };
+    var a1 = avg(shift(t, -7), t), a0 = avg(shift(t, -14), shift(t, -7)), last = pts[pts.length - 1];
+    var msg = "latest " + last.w + " " + unit;
+    if (a1 != null) msg += " · 7-day average " + a1.toFixed(1);
+    if (a1 != null && a0 != null) msg += " (" + (a1 - a0 > 0 ? "+" : "") + (a1 - a0).toFixed(1) + ")";
+    txt.textContent = msg;
+    var dn = function (k) { return Math.round(parse(k).getTime() / 864e5); };
+    var x0 = dn(pts[0].date), x1 = dn(last.date);
+    var lo = Math.min.apply(null, pts.map(function (p) { return p.w; })), hi = Math.max.apply(null, pts.map(function (p) { return p.w; }));
+    if (hi - lo < 1) { lo -= 0.5; hi += 0.5; }
+    var L = 34, R = 312, T = 10, B = 86;
+    var X = function (k) { return (L + (dn(k) - x0) / Math.max(1, x1 - x0) * (R - L)).toFixed(1); };
+    var Y = function (w) { return (B - (w - lo) / (hi - lo) * (B - T)).toFixed(1); };
+    var lab = function (k) { return parse(k).toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
+    svg.innerHTML =
+      '<line x1="' + L + '" x2="' + R + '" y1="' + B + '" y2="' + B + '" stroke="var(--line)"/>' +
+      '<text x="' + (L - 6) + '" y="' + (T + 3) + '" text-anchor="end">' + hi.toFixed(1) + "</text>" +
+      '<text x="' + (L - 6) + '" y="' + (B + 3) + '" text-anchor="end">' + lo.toFixed(1) + "</text>" +
+      '<path d="' + pts.map(function (p, i) { return (i ? "L" : "M") + X(p.date) + " " + Y(p.w); }).join(" ") + '" fill="none" stroke="var(--ink)" stroke-width="1" stroke-linejoin="round"/>' +
+      '<circle cx="' + X(last.date) + '" cy="' + Y(last.w) + '" r="3" fill="var(--green)"/>' +
+      '<text x="' + L + '" y="102">' + lab(pts[0].date) + "</text>" +
+      '<text x="' + R + '" y="102" text-anchor="end">' + lab(last.date) + "</text>";
+    svg.removeAttribute("hidden");
+  }
+
+  /* ---- actions ---- */
+  function addMeal(src) {
+    var m = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), at: new Date().toISOString(),
+      name: String(src.name).trim().slice(0, 120), kcal: Math.max(0, Math.round(Number(src.kcal) || 0)),
+      protein: g1(src.protein), carbs: g1(src.carbs), fat: g1(src.fat) };
+    var date = S.date;
+    mutateDay(date, function (d) {
+      d.meals = d.meals || [];
+      if (!d.meals.some(function (x) { return x.id === m.id; })) d.meals.push(m);
+    }, "log " + date + ": " + m.name);
+  }
+  function removeMeal(m) {
+    var date = S.date;
+    mutateDay(date, function (d) { d.meals = (d.meals || []).filter(function (x) { return x.id !== m.id; }); }, "log " + date + ": remove " + m.name);
+  }
+  $("add").addEventListener("submit", function (e) {
+    e.preventDefault();
+    addMeal({ name: $("aName").value, kcal: $("aK").value, protein: $("aP").value, carbs: $("aC").value, fat: $("aF").value });
+    e.target.reset(); $("aName").blur();
+  });
+  $("weight").addEventListener("change", function () {
+    var raw = this.value.trim(), v = raw === "" ? null : Math.round(Number(raw) * 10) / 10, date = S.date;
+    if (v !== null && !(v > 0)) { this.value = ""; return; }
+    if ((dayOf(date).weight == null ? null : dayOf(date).weight) === v) return;
+    mutateDay(date, function (d) { if (v === null) delete d.weight; else d.weight = v; }, "log " + date + ": weight");
+  });
+  $("weight").addEventListener("keydown", function (e) { if (e.key === "Enter") this.blur(); });
+  $("cre").onclick = function () {
+    var date = S.date, v = !dayOf(date).creatine;
+    mutateDay(date, function (d) { if (v) d.creatine = true; else delete d.creatine; }, "log " + date + ": creatine " + (v ? "taken" : "cleared"));
+  };
+  $("prev").onclick = function () { S.date = shift(S.date, -1); render(); };
+  $("next").onclick = function () { if (S.date < today()) { S.date = shift(S.date, 1); render(); } };
+  $("dateLabel").onclick = function () { S.date = today(); render(); };
+  $("sync").onclick = function () { if (S.pending.length) pump(); else refresh(); };
+  $("refresh").onclick = refresh;
+  $("tBtn").onclick = function () {
+    var f = $("targets"), g = goals();
+    f.hidden = !f.hidden;
+    if (!f.hidden) { $("gK").value = g.kcal; $("gP").value = g.protein; $("gC").value = g.carbs; $("gF").value = g.fat; $("gU").value = g.unit; }
+  };
+  $("targets").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var n = function (id) { return Math.max(0, Math.round(Number($(id).value) || 0)); };
+    var next = { kcal: n("gK"), protein: n("gP"), carbs: n("gC"), fat: n("gF"), unit: $("gU").value === "kg" ? "kg" : "lb" };
+    mutate("goals.json", function (data) { Object.assign(data, next); }, "update targets");
+    $("targets").hidden = true;
+  });
+  var outArmed = false;
+  $("out").onclick = function () {
+    if (!outArmed) { outArmed = true; this.textContent = "Tap again to remove the key from this device"; return; }
+    store.del(CFG_KEY); store.del(CACHE_KEY); location.reload();
+  };
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden || $("app").hidden) return;
+    if (S.pending.length) pump(); else if (Date.now() - S.lastRefresh > 30000) refresh();
+    render();
+  });
+  window.addEventListener("online", function () { if (S.pending.length) pump(); });
+
+  /* ---- setup ---- */
+  function start() {
+    $("setup").hidden = true; $("app").hidden = false;
+    S.lastRefresh = Date.now();
+    setSync("Loading…");
+    file("goals.json"); file(monthPath(S.date));
+    render();
+  }
+  $("setupForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    var msg = $("setupMsg");
+    cfg = { owner: $("sOwner").value.trim(), repo: $("sRepo").value.trim(), token: $("sToken").value.trim() };
+    msg.textContent = "Checking…";
+    try {
+      var r = await fetch(base(), { headers: headers(), cache: "no-store" });
+      if (r.status === 401) { msg.textContent = "GitHub rejected that key. Copy it again and retry."; return; }
+      if (r.status === 404) { msg.textContent = "That key can't see " + cfg.owner + "/" + cfg.repo + ". Check the names and that the key covers this repository."; return; }
+      if (!r.ok) { msg.textContent = "GitHub answered with an error (" + r.status + "). Try again in a minute."; return; }
+    } catch (err) { msg.textContent = "Couldn't reach GitHub. Check your connection."; return; }
+    store.set(CFG_KEY, cfg);
+    $("sToken").value = "";
+    start();
+  });
+  if (cfg.token) start();
+  else { $("sOwner").value = cfg.owner; $("sRepo").value = cfg.repo; $("setup").hidden = false; }
+})();
+</script>
+</body>
+</html>
